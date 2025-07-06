@@ -1,0 +1,372 @@
+import pygame
+import sys
+import time
+
+
+# --- Init Pygame ---
+pygame.init()
+WIDTH, HEIGHT = 800, 600
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("The Great Garbage Heist")
+font = pygame.font.SysFont("Times New Roman", 18)
+clock = pygame.time.Clock()
+
+
+# --- Game State Variables ---
+suspicion = 0
+good_choices = 0
+timer_start = None
+TIMER_DURATION = 7 * 60  # 7 minutes in seconds
+
+
+# --- Load blank assets (replace later) ---
+def load_blank(color=(20, 20, 20)):
+   surf = pygame.Surface((WIDTH, HEIGHT))
+   surf.fill(color)
+   return surf
+
+
+def fade_to_black():
+   fade = pygame.Surface((WIDTH, HEIGHT))
+   fade.fill((0, 0, 0))
+   for alpha in range(0, 300, 5):
+       fade.set_alpha(min(alpha, 255))
+       screen.blit(fade, (0, 0))
+       pygame.display.update()
+       pygame.time.delay(30)
+
+
+backgrounds = {
+   "black": load_blank((0, 0, 0)),
+   "alley": load_blank((50, 50, 50)),
+   "restaurant": load_blank((70, 0, 70)),
+   "counter": load_blank((0, 70, 70)),
+   "manager": load_blank((70, 70, 0)),
+   "exit": load_blank((40, 40, 60)),
+   "guard": load_blank((60, 30, 30))
+}
+
+
+characters = {
+   "none": pygame.Surface((0, 0)),
+   "raccoons": load_blank((150, 150, 150)),
+   "employee": load_blank((200, 100, 100)),
+   "manager": load_blank((100, 200, 100)),
+   "guard": load_blank((100, 100, 200)),
+}
+
+
+# --- Helper Functions ---
+def draw_scene(bg_name, char_name, text_lines):
+   screen.blit(backgrounds[bg_name], (0, 0))
+   if characters[char_name].get_size() != (0, 0):
+       screen.blit(characters[char_name], (500, 200))
+   pygame.draw.rect(screen, (0, 0, 0), (20, 350, 760, 230))
+   y = 370
+   for line in text_lines:
+       rendered = font.render(line, True, (255, 255, 255))
+       screen.blit(rendered, (30, y))
+       y += 30
+   draw_ui()
+   pygame.display.flip()
+
+
+def draw_ui():
+   # Timer display
+   if timer_start:
+       elapsed = int(time.time() - timer_start)
+       remaining = max(0, TIMER_DURATION - elapsed)
+       minutes = remaining // 60
+       seconds = remaining % 60
+       timer_text = font.render(f"Time Left: {minutes:02}:{seconds:02}", True, (255, 255, 255))
+       screen.blit(timer_text, (10, 10))
+
+
+   # Suspicion and good counters
+   susp_text = font.render(f"Suspicion: {suspicion}", True, (255, 100, 100))
+   good_text = font.render(f"Unsuspecting: {good_choices}", True, (100, 255, 100))
+   screen.blit(susp_text, (10, 40))
+   screen.blit(good_text, (10, 70))
+
+
+def wait_for_key():
+   while True:
+       for event in pygame.event.get():
+           if event.type == pygame.QUIT:
+               pygame.quit(); sys.exit()
+           if event.type == pygame.KEYDOWN:
+               return event.key
+       draw_ui()
+       pygame.display.flip()
+       clock.tick(30)
+
+
+# --- Gameplay Flow with Timer ---
+def play_game():
+   global timer_start, suspicion, good_choices
+
+
+   play_intro()
+   timer_start = time.time()
+
+
+   scene_index = 1
+   while True:
+       elapsed = int(time.time() - timer_start)
+       if elapsed >= TIMER_DURATION:
+           fade_to_black()
+           draw_scene("black", "none", ["Time’s up! The garbage truck took your treasure."])
+           pygame.time.wait(3000)
+           break
+
+
+       if suspicion >= 3:
+           fade_to_black()
+           draw_scene("black", "none", ["Too suspicious! You were caught by security."])
+           pygame.time.wait(3000)
+           break
+
+
+       if scene_index == 1:
+           draw_scene("restaurant", "raccoons", [
+               "~~~Rocky, Ricky, & Roxey enter the Tim Hortons. They overhear some workers~~~",
+               "Worker 1: The place smells, I bet it's that dumpster in the alleyway",
+               "Worker 2: Don’t worry about it, the garbage truck is gonna get rid of it in 7 minutes",
+               "Rocky: OUR PRECIOUS TREASURE?? NOOOOOO",
+               "Roxey: We must get our crusty hands on those keys before our trash be taken away!",
+               "","Click any key to continue."
+           ])
+           wait_for_key()
+           fade_to_black()
+           draw_scene("restaurant", "raccoons", [
+               "~~~The door swings open.~~~","~~~The raccoon-human ponders its way through the door.~~~",
+               "A) Adjust the trench coat, trip slightly, then flash a sheepish smile? ",
+               "B) Run through those door confidently! "
+           ])
+           key = wait_for_key()
+           if key == pygame.K_a:
+               good_choices += 1
+               draw_scene("restaurant", "raccoons", [
+                   "Good choice! Awkwardness is relatable","+1 Unsuspecting","","Click any key to continue."
+               ])
+           elif key == pygame.K_b:
+               suspicion += 1
+               draw_scene("restaurant", "raccoons", [
+                   "You ran too fast, you tripped and lost a shoe!","+1 Suspicious","","Click any key to continue."
+               ])
+           wait_for_key()
+           fade_to_black()
+
+
+           scene_index += 1
+
+
+       elif scene_index == 2:
+           draw_scene("counter", "employee", [
+               "~~~You walk up to the worker and order a snack.~~~","~~~What do you ask for?~~~",
+               "A) Order frogs.",
+               "B) Order an Ice Capp."
+           ])
+           key = wait_for_key()
+           if key == pygame.K_b:
+               good_choices += 1
+               draw_scene("counter", "employee", [
+                   "Believable nonsense. It was so good, you asked for the manager!","+1 Unsuspecting","","Click any key to continue."
+               ])
+           elif key == pygame.K_a:
+               suspicion += 1
+               draw_scene("counter", "employee", [
+                   "That was so weird and off-putting, the worker calls in the manager.","+1 Suspicious","","Click any key to continue."
+               ])
+           wait_for_key()
+           fade_to_black()
+           scene_index += 1
+
+
+       elif scene_index == 3:
+           draw_scene("manager", "manager", [
+           "~~~The manager asks who you are.~~~","~~~How do you reply?~~~",
+               "A) **Insert chitter noises",
+               "B) 'We're time travellers from the 11th of September, 2001.'",
+               "C) Applaud the staff for their hard work. "
+           ])
+           key = wait_for_key()
+           if key == pygame.K_a:
+               suspicion += 2
+               draw_scene("manager", "manager", [
+                   "The raccoon noises are an instant givaway.","+2 Suspicious","","Click any key to continue."
+               ])
+           elif key == pygame.K_b:
+               suspicion += 1
+               draw_scene("manager", "manager", [
+                   "TF. That's weird.","+1 Suspicious","","Click any key to continue."
+               ])
+           else:
+               good_choices += 1
+               draw_scene("manager", "manager", [
+                   "Quirky but plausible.","+1 Unsuspecting","","Click any key to continue."
+               ])
+           wait_for_key()
+           fade_to_black()
+           scene_index += 1
+
+
+       elif scene_index == 4:
+           draw_scene("manager", "raccoons", [
+               "~~~Don't forget, you need the manager's key to unlock the garbage!~~~","~~~Luckily, Rocky spots the key hanging out of her pocket!~~~","~~~How do you distract her to get the key?~~~",
+               "A) Meow and whisper seductively, 'What's cookin good lookin?'",
+               "B) Point over her shoulder and say, 'What's that over there?!'"
+           ])
+           key = wait_for_key()
+           if key == pygame.K_a:
+               good_choices += 1
+               draw_scene("manager", "raccoons", [
+                   "The manager is DEFINITELY distracted.","+1 Unsuspecting","","Click any key to continue."
+               ])
+           else:
+               suspicion += 1
+               draw_scene("manager", "raccoons", [
+                   "Ya, that trick never really works.","+1 Suspicious","","Click any key to continue."
+               ])
+           wait_for_key()
+           fade_to_black()
+           scene_index += 1
+
+
+       elif scene_index == 5:
+           draw_scene("exit", "raccoons", [
+               "~~~Ricky manages to grab the key from the managers pocket.~~~","~~~Now it's time to make a run for it! How do you escape?~~~",
+               "A) Drop to the floor to play dead.",
+               "B) Wave slowly and say 'Excuse us, fellow carbon-based lifeform.'",
+               "C) Rickroll em and roll on out."
+           ])
+           key = wait_for_key()
+           if key == pygame.K_a:
+               suspicion += 1
+               draw_scene("exit", "raccoons", [
+                   "Everyone is concerned and looks at you. Not very stealthy.","+1 Suspicious","","Click any key to continue."
+               ])
+           elif key == pygame.K_b:
+               good_choices += 1
+               draw_scene("exit", "raccoons", [
+                   "Humorous and polite.","+1 Unsuspecting","","Click any key to continue."
+               ])
+           else:
+               suspicion += 1
+               draw_scene("exit", "raccoons", [
+                   "What a skeptical soundtrack...","+1 Suspicious","","Click any key to continue."
+               ])
+           wait_for_key()
+           fade_to_black()
+           scene_index += 1
+
+
+       elif scene_index == 6:
+           draw_scene("guard", "guard", [
+               "~~You try to slip out the door, but a security guard is in the way!~~~","~~~How do you bypass him?~~~",
+               "A) Attempt a backflip.",
+               "B) Tip your fedora.",
+           ])
+           key = wait_for_key()
+           if key == pygame.K_b:
+               good_choices += 1
+               draw_scene("guard", "guard", [
+                   "Very civil and pedestrian. The guard approves and smiles back!","+1 Unsuspecting","","Click any key to continue."
+               ])
+           else:
+               suspicion += 1
+               draw_scene("guard", "guard", [
+                   "Raccoons can't backflip, stupid.","+1 Suspicious","","Click any key to continue."
+               ])
+           wait_for_key()
+           fade_to_black()
+           scene_index += 1
+
+
+       elif scene_index == 7:
+           draw_scene("restaurant", "raccoons", [
+               "~~~You make it out of the Tim Hortorns, but you're not safe just yet!~~~","~~~A passerby looks at you funny. How do you react?~~~",
+               "A) Reach out your hand for a three-finger handshake.",
+               "B) Start running in circles. "
+           ])
+           key = wait_for_key()
+           if key == pygame.K_a:
+               good_choices += 1
+               draw_scene("restaurant", "raccoons", [
+                   "Weird, but it's the only way out I guess.","+1 Unsuspecting","","Click any key to continue."
+               ])
+           else:
+               suspicion += 1
+               draw_scene("restaurant", "raccoons", [
+                   "Why are you drawing more attention to yourself?","+1 Suspicious","","Click any key to continue."
+               ])
+           wait_for_key()
+           fade_to_black()
+           scene_index += 1
+
+
+       else:
+           fade_to_black()
+           draw_scene("black", "none", [
+               f"Mission Complete! Good choices: {good_choices}, Suspicion: {suspicion}"
+           ])
+           pygame.time.wait(4000)
+           break
+
+
+# --- Intro Scene ---
+def play_intro():
+   draw_scene("black", "none", ["The Great Garbage Heist"])
+   wait_for_key()
+   fade_to_black()
+
+
+   draw_scene("black", "none", [
+       "Introduction:",
+       "Three raccoons discover the ultimate prize:",
+       "a giant garbage bin locked outside Tim Hortons.",
+       "Spotting an old trench coat, they pile inside",
+       "to disguise themselves as one tall, awkward human.",
+       "The goal? Get the manager’s key and unlock their treasure",
+       "before the dump truck empties the trash. Easy? Not quite…"
+   ])
+   wait_for_key()
+   fade_to_black()
+
+
+   draw_scene("black", "none", [
+       "Instructions:",
+       "You will be given 2-3 actions to choose from.",
+       "Press the letter key that matches your choice.",
+       "Correct answers lower suspicion.",
+       "Weird ones raise suspicion.",
+       "If suspicion hits 3, you’ll be caught!"
+   ])
+   wait_for_key()
+   fade_to_black()
+
+
+   draw_scene("alley", "raccoons", [
+       "Rocky: Yooo look, they got a whole trash bin filled with garbage!!",
+       "Ricky: Sweet!",
+       "Roxey: Wait yall there’s a lock! We can't get in… grr",
+       "Rocky: There must be a key inside this store. But how do we get in?",
+       "Ricky: *sees jacket* I have an idea…",
+       "","Click any key to continue."
+   ])
+   wait_for_key()
+
+
+   fade_to_black()
+   draw_scene("black", "none", ["GOAL: Get the manager’s key and unlock the trash bins.","","Click any key to continue."])
+   wait_for_key()
+   fade_to_black()
+
+
+# --- Main ---
+def main():
+   play_game()
+   pygame.quit()
+
+
+main()
